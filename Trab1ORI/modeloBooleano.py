@@ -2,22 +2,63 @@ import nltk
 import sys
 from nltk.corpus import stopwords
 from nltk.stem import RSLPStemmer
+from nltk.tokenize import word_tokenize
 
 nltk.download('stopwords')
 nltk.download('rslp')
+nltk.download('punkt')
+
 
 # Carregando a lista de stopwords
 stopwordsPt = set(stopwords.words('portuguese'))
 indiceInvertido = {}
 stemmer = RSLPStemmer()
 
-def dividirTextoEmPalavras(texto):
-    texto = ' '.join(texto.split())
-    caracteresSeparadores = ".,...,!?"
-    for separador in caracteresSeparadores:
-        texto = texto.replace(separador, ' ')
-    palavras = texto.lower().split()
-    return palavras
+# def dividirTextoEmPalavras(texto):
+#     texto = ' '.join(texto.split())
+#     caracteresSeparadores = ".,...,!?"
+#     for separador in caracteresSeparadores:
+#         texto = texto.replace(separador, ' ')
+#     palavras = texto.lower().split()
+#     return palavras
+
+def lerConsulta():
+    consulta = ""
+    try:
+        with open("consulta.txt", "r") as arquivo_consulta:
+            consulta = arquivo_consulta.read().strip()
+    except FileNotFoundError as e:
+        print(f"Erro para encontrar o arquivo de consulta: {e}")
+    return consulta
+
+def processarConsulta(query):
+    query_terms = word_tokenize(query.lower())
+    resultado = set()
+    operador = None
+
+    for termo in query_terms:
+        if termo == '&':
+            operador = 'AND'
+        elif termo == '|':
+            operador = 'OR'
+        elif termo == '!':
+            operador = 'NOT'
+        else:
+            termo = stemmer.stem(termo)  # Lematização do termo
+            termo_docs = indiceInvertido.get(termo, set())
+
+            if operador is None:
+                resultado.update(termo_docs)
+            elif operador == 'AND':
+                resultado.intersection_update(termo_docs)
+            elif operador == 'OR':
+                resultado.update(termo_docs)
+            elif operador == 'NOT':
+                resultado.difference_update(termo_docs)
+
+            operador = None
+
+    return resultado
 
 try:
     if len(sys.argv) != 2:
@@ -32,7 +73,7 @@ try:
                     faixa = faixa.strip()
                     with open(f'C:/Users/joaop/OneDrive - Universidade Federal de Uberlândia/É O PROGRAMAS/Faculdade/ORI/Trab1ORI/base_samba/{faixa}', 'r') as arquivoFaixa:
                         for letra in arquivoFaixa:
-                            palavras = dividirTextoEmPalavras(letra)
+                            palavras = word_tokenize(letra.lower())
                             for palavra in palavras:
                                 # Verifica se não é uma stopword
                                 if palavra not in stopwordsPt:
@@ -49,13 +90,25 @@ try:
                                         # Se não está, cria a entrada para o radical na faixa
                                         indiceInvertido[radical] = {numeroFaixa: 1}
                     numeroFaixa += 1
+
             # Escreve o índice invertido no arquivo
             for radical, faixas in indiceInvertido.items():
                 arquivo.write(f"{radical}: ")
                 for faixa, contagem in faixas.items():
-                    arquivo.write(f"{faixa},{contagem}, ")
+                    arquivo.write(f"{faixa},{contagem} ")
                 arquivo.write("\n")
-    print(indiceInvertido, end="\n")
+
+        # Lê a consulta
+        consulta = lerConsulta()
+        print(consulta)
+
+        # Processa a consulta
+        resultado = processarConsulta(consulta)
+    resultadoString = ", ".join(map(str, resultado))
+
+    with open('resposta.txt', 'w') as arquivoResposta:
+        arquivoResposta.write(f"{len(resultado)}\n")
+        arquivoResposta.write(resultadoString)
 
 except FileNotFoundError as e:
     print(f"Erro para encontrar o arquivo: {e}")
