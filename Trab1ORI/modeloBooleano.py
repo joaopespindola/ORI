@@ -1,5 +1,6 @@
 import nltk
 import sys
+import os
 from nltk.corpus import stopwords
 from nltk.stem import RSLPStemmer
 from nltk.tokenize import word_tokenize
@@ -8,27 +9,16 @@ nltk.download('stopwords')
 nltk.download('rslp')
 nltk.download('punkt')
 
-
 # Carregando a lista de stopwords
 stopwordsPt = set(stopwords.words('portuguese'))
+# Dicionário p índice invertido
 indiceInvertido = {}
 stemmer = RSLPStemmer()
+faixas = []  # Lista para armazenar nomes de faixas
 
-# def dividirTextoEmPalavras(texto):
-#     texto = ' '.join(texto.split())
-#     caracteresSeparadores = ".,...,!?"
-#     for separador in caracteresSeparadores:
-#         texto = texto.replace(separador, ' ')
-#     palavras = texto.lower().split()
-#     return palavras
-
-def lerConsulta():
-    consulta = ""
-    try:
-        with open("consulta.txt", "r") as arquivo_consulta:
-            consulta = arquivo_consulta.read().strip()
-    except FileNotFoundError as e:
-        print(f"Erro para encontrar o arquivo de consulta: {e}")
+def leConsulta(arquivoConsulta):
+    with open(arquivoConsulta, 'r') as arquivoConsulta:
+            consulta = arquivoConsulta.read().strip()
     return consulta
 
 def processarConsulta(query):
@@ -45,33 +35,40 @@ def processarConsulta(query):
             operador = 'NOT'
         else:
             termo = stemmer.stem(termo)  # Lematização do termo
-            termo_docs = indiceInvertido.get(termo, set())
+            termoDocs = indiceInvertido.get(termo, set())
 
             if operador is None:
-                resultado.update(termo_docs)
+                resultado.update(termoDocs)
             elif operador == 'AND':
-                resultado.intersection_update(termo_docs)
+                resultado.intersection_update(termoDocs)
             elif operador == 'OR':
-                resultado.update(termo_docs)
+                resultado.update(termoDocs)
             elif operador == 'NOT':
-                resultado.difference_update(termo_docs)
+                resultado.difference_update(termoDocs)
 
             operador = None
 
     return resultado
 
 try:
-    if len(sys.argv) != 2:
-        print("Uso: python script.py base.txt")
+    if len(sys.argv) != 3:
+        print("Preciso de 3 argumentos sendo eles: nome do script.py, nome da base.txt, nome da consulta.txt")
     else:
-        arquivo_base = sys.argv[1]
+        arquivoBase = sys.argv[1]
+        arquivoConsulta = sys.argv[2]
+        # Obtendo o diretório atual do script
+        diretorioAtual = os.path.dirname(os.path.abspath(__file__))
         with open('indice.txt', 'w') as arquivo:
             # Fazendo a leitura da base de dados
-            with open(arquivo_base, 'r') as album:
+            with open("base_samba/" + arquivoBase, 'r') as album:
                 numeroFaixa = 1
                 for faixa in album:
                     faixa = faixa.strip()
-                    with open(f'C:/Users/joaop/OneDrive - Universidade Federal de Uberlândia/É O PROGRAMAS/Faculdade/ORI/Trab1ORI/base_samba/{faixa}', 'r') as arquivoFaixa:
+                    # Caminho relativo para a faixa
+                    faixaPath = os.path.join(diretorioAtual, 'base_samba', faixa)  
+                    # Adiciona o nome da faixa à lista
+                    faixas.append(faixa)  
+                    with open(faixaPath, 'r') as arquivoFaixa:
                         for letra in arquivoFaixa:
                             palavras = word_tokenize(letra.lower())
                             for palavra in palavras:
@@ -81,33 +78,34 @@ try:
                                     radical = stemmer.stem(palavra)
                                     # Verifica se o radical já está no dicionário da faixa
                                     if radical in indiceInvertido:
-                                        # Se já está, atualiza a contagem da faixa
+                                        # Se já tá, atualiza a contagem da faixa
                                         if numeroFaixa in indiceInvertido[radical]:
                                             indiceInvertido[radical][numeroFaixa] += 1
                                         else:
                                             indiceInvertido[radical][numeroFaixa] = 1
                                     else:
-                                        # Se não está, cria a entrada para o radical na faixa
+                                        # Se não tá, cria a entrada para o radical na faixa
                                         indiceInvertido[radical] = {numeroFaixa: 1}
                     numeroFaixa += 1
 
             # Escreve o índice invertido no arquivo
-            for radical, faixas in indiceInvertido.items():
+            for radical, faixas_dict in indiceInvertido.items():
                 arquivo.write(f"{radical}: ")
-                for faixa, contagem in faixas.items():
-                    arquivo.write(f"{faixa},{contagem} ")
+                for faixa, contagem in faixas_dict.items():
+                    arquivo.write(f"{faixas[faixa - 1]} ({contagem} vezes), ")  # Obtém o nome da faixa correspondente
                 arquivo.write("\n")
 
-        # Lê a consulta
-        consulta = lerConsulta()
-        print(consulta)
+        consulta = leConsulta(arquivoConsulta)
 
         # Processa a consulta
         resultado = processarConsulta(consulta)
-    resultadoString = ", ".join(map(str, resultado))
 
+    # Abre o arquivo de resposta e escreve os nomes das faixas correspondentes
     with open('resposta.txt', 'w') as arquivoResposta:
         arquivoResposta.write(f"{len(resultado)}\n")
+        # Obtém os nomes das faixas correspondentes
+        nomes_faixas = [faixas[numero - 1] for numero in resultado]  
+        resultadoString = "\n".join(nomes_faixas)
         arquivoResposta.write(resultadoString)
 
 except FileNotFoundError as e:
