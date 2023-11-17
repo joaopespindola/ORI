@@ -16,16 +16,16 @@ stopwordsPt = set(stopwords.words('portuguese'))
 # Dicionário para o índice invertido
 indiceInvertido = {}
 # Dicionário para os pesos dos termos nos documentos
-pesos = {}
-# Lista para armazenar nomes de faixas
-faixas = []
+pesosDocumentos = {}
+# Lista para armazenar nomes de arquivo
+nomesArquivo = []
 # Stemmer para lematização das palavras
 stemmer = RSLPStemmer()
 # Pontuações a serem ignoradas
-pontos = ['!', '?', ',', '.']
+pontuacoesIgnoradas = ['!', '?', ',', '.']
 
 # Função para ler a consulta de um arquivo
-def leConsulta(arquivoConsulta):
+def lerConsulta(arquivoConsulta):
     with open(arquivoConsulta, 'r') as arquivoConsulta:
         consulta = arquivoConsulta.read().strip()
     return consulta
@@ -33,9 +33,9 @@ def leConsulta(arquivoConsulta):
 # Função para calcular os pesos da consulta
 def calcularPesosConsulta(consulta):
     pesosConsulta = {}
-    query_terms = word_tokenize(consulta.lower())
+    termosConsulta = word_tokenize(consulta.lower())
 
-    for termo in query_terms:
+    for termo in termosConsulta:
         if termo not in stopwordsPt:
             radical = stemmer.stem(termo)
             # Verifica se o radical existe no índice invertido
@@ -48,11 +48,11 @@ def calcularPesosConsulta(consulta):
     # Crie uma cópia do dicionário antes de iterar sobre ele
     for radical, frequenciaTermo in list(pesosConsulta.items()):
         if radical in indiceInvertido:  # Verifica se o radical existe no índice invertido
-            frequenciaTermoInversa = math.log10(len(faixas) / len(indiceInvertido[radical]))
-            tfidf = calculaTFIDF(frequenciaTermo, frequenciaTermoInversa)
+            frequenciaTermoInversa = math.log10(len(nomesArquivo) / len(indiceInvertido[radical]))
+            tfidf = calcularTFIDF(frequenciaTermo, frequenciaTermoInversa)
             
             # Verifica se o TFIDF é diferente de zero antes de adicionar ao dicionário
-            if tfidf != 0 and radical not in pontos:
+            if tfidf != 0 and radical not in pontuacoesIgnoradas:
                 pesosConsulta[radical] = tfidf
             else:
                 del pesosConsulta[radical]  # Remove o termo se o TFIDF for zero
@@ -60,7 +60,7 @@ def calcularPesosConsulta(consulta):
     return pesosConsulta
 
 # Função para calcular a similaridade entre dois conjuntos de pesos
-def calculaSimilaridade(pesosConsulta, pesosDocumento):
+def calcularSimilaridade(pesosConsulta, pesosDocumento):
     produtoEscalar = 0
     moduloPesosConsulta = 0
     moduloPesosDocumento = 0
@@ -86,11 +86,11 @@ def calculaSimilaridade(pesosConsulta, pesosDocumento):
 
 # Função para processar a consulta e obter o resultado
 def processarConsulta(query):
-    query_terms = word_tokenize(query.lower())
+    termosConsulta = word_tokenize(query.lower())
     resultado_final = set()
     operador = None
 
-    for termo in query_terms:
+    for termo in termosConsulta:
         if termo == '&':
             operador = 'AND'
         else:
@@ -106,11 +106,11 @@ def processarConsulta(query):
     return resultado_final
 
 # Função para calcular o TFIDF de um termo
-def calculaTFIDF(frequenciaTermo, frequenciaTermoInversa):
-    return 0 if frequenciaTermo == 0 else calculaTF(frequenciaTermo) * frequenciaTermoInversa
+def calcularTFIDF(frequenciaTermo, frequenciaTermoInversa):
+    return 0 if frequenciaTermo == 0 else calcularTF(frequenciaTermo) * frequenciaTermoInversa
 
 # Função para calcular o TF de um termo
-def calculaTF(frequenciaTermo):
+def calcularTF(frequenciaTermo):
     return 0 if frequenciaTermo == 0 else 1 + math.log10(frequenciaTermo)
 
 # Esse bloco é executado apenas se o script for chamado diretamente, não se for importado como um módulo
@@ -129,17 +129,17 @@ try:
         arquivoConsulta = "base1/" + sys.argv[2]
 
         # Abre o arquivo índice.txt para escrita
-        with open('indice.txt', 'w') as arquivo:
+        with open('indice.txt', 'w') as arquivoIndice:
             # Fazendo a leitura da base de dados
-            with open("base1/" + arquivoBase, 'r') as album:
-                numeroFaixa = 1
-                for faixa in album:
-                    faixa = faixa.strip()
-                    # Caminho relativo para a faixa
-                    faixaPath = os.path.join(diretorioAtual, 'base1', faixa)  
-                    # Adiciona o nome da faixa à lista
-                    faixas.append(faixa)  
-                    with open(faixaPath, 'r') as arquivoFaixa:
+            with open("base1/" + arquivoBase, 'r') as arquivosPasta:
+                numeroArquivo = 1
+                for arquivo in arquivosPasta:
+                    arquivo = arquivo.strip()
+                    # Caminho relativo para a arquivo
+                    arquivoPath = os.path.join(diretorioAtual, 'base1', arquivo)  
+                    # Adiciona o nome do arquivo à lista
+                    nomesArquivo.append(arquivo)  
+                    with open(arquivoPath, 'r') as arquivoFaixa:
                         for letra in arquivoFaixa:
                             palavras = word_tokenize(letra.lower())
                             for palavra in palavras:
@@ -149,28 +149,28 @@ try:
                                     radical = stemmer.stem(palavra)
                                     
                                     if radical in indiceInvertido: 
-                                        # Se já tá, atualiza a contagem da faixa
-                                        if numeroFaixa in indiceInvertido[radical]:
-                                            indiceInvertido[radical][numeroFaixa] += 1
+                                        # Se já tá, atualiza a contagem do arquivo
+                                        if numeroArquivo in indiceInvertido[radical]:
+                                            indiceInvertido[radical][numeroArquivo] += 1
                                         else:
-                                            indiceInvertido[radical][numeroFaixa] = 1
+                                            indiceInvertido[radical][numeroArquivo] = 1
                                     else:
                                         # Se não tá, cria a entrada para o radical na faixa
-                                        indiceInvertido[radical] = {numeroFaixa: 1}
-                    numeroFaixa += 1
+                                        indiceInvertido[radical] = {numeroArquivo: 1}
+                    numeroArquivo += 1
             
             # Abre o arquivo pesos.txt para escrita
             with open('pesos.txt', 'w') as arquivoPesos:
                 # Fazendo a leitura da base de dados
-                with open("base1/" + arquivoBase, 'r') as album:
-                    numeroFaixa = 1
-                    for faixa in album:
-                        faixa = faixa.strip()
-                        # Caminho relativo para a faixa
-                        faixaPath = os.path.join(diretorioAtual, 'base1', faixa)
-                        # Adiciona o nome da faixa à lista
+                with open("base1/" + arquivoBase, 'r') as arquivosPasta:
+                    numeroArquivo = 1
+                    for arquivo in arquivosPasta:
+                        arquivo = arquivo.strip()
+                        # Caminho relativo para o arquivo
+                        arquivoPath = os.path.join(diretorioAtual, 'base1', arquivo)
+                        # Adiciona o nome do arquivo à lista
                         pesosDocumento = {}
-                        with open(faixaPath, 'r') as arquivoFaixa:
+                        with open(arquivoPath, 'r') as arquivoFaixa:
                             for letra in arquivoFaixa:
                                 palavras = word_tokenize(letra.lower())
                                 for palavra in palavras:
@@ -182,27 +182,27 @@ try:
                                             pesosDocumento[radical] += 1
                                         else:
                                             pesosDocumento[radical] = 1
-                        arquivoPesos.write(f"{faixa}: ")
+                        arquivoPesos.write(f"{arquivo}: ")
                         for radical, frequenciaTermo in pesosDocumento.items():
-                            frequenciaTermoInversa = math.log10(len(faixas) / len(indiceInvertido[radical]))
-                            tfidf = calculaTFIDF(frequenciaTermo, frequenciaTermoInversa)
-                            if tfidf != 0 and radical not in pontos:
-                                if faixa not in pesos:
-                                    pesos[faixa] = {}
-                                pesos[faixa][radical] = tfidf
+                            frequenciaTermoInversa = math.log10(len(nomesArquivo) / len(indiceInvertido[radical]))
+                            tfidf = calcularTFIDF(frequenciaTermo, frequenciaTermoInversa)
+                            if tfidf != 0 and radical not in pontuacoesIgnoradas:
+                                if arquivo not in pesosDocumentos:
+                                    pesosDocumentos[arquivo] = {}
+                                pesosDocumentos[arquivo][radical] = tfidf
                                 arquivoPesos.write(f"{radical}, {tfidf} ")
                         arquivoPesos.write("\n")
 
             # Escreve o índice invertido no arquivo
-            for radical, faixas_dict in indiceInvertido.items():
-                if radical not in pontos:
-                    arquivo.write(f"{radical}: ")
-                    for faixa, contagem in faixas_dict.items():
-                        arquivo.write(f"{faixas[faixa - 1]} ({contagem} vezes), ")  # Obtém o nome da faixa correspondente
-                    arquivo.write("\n")
+            for radical, arquivo_dict in indiceInvertido.items():
+                if radical not in pontuacoesIgnoradas:
+                    arquivoIndice.write(f"{radical}: ")
+                    for arquivo, contagem in arquivo_dict.items():
+                        arquivoIndice.write(f"{nomesArquivo[arquivo - 1]} ({contagem} vezes), ")  # Obtém o nome da faixa correspondente
+                    arquivoIndice.write("\n")
 
         # Leitura da consulta
-        consulta = leConsulta(arquivoConsulta)
+        consulta = lerConsulta(arquivoConsulta)
 
         # Cálculo dos pesos da consulta
         pesosConsulta = calcularPesosConsulta(consulta)
@@ -210,19 +210,19 @@ try:
         # Processamento da consulta
         resultado = processarConsulta(consulta)
 
-        # Abre o arquivo de resposta e escreve os nomes das faixas correspondentes
+        # Abre o arquivo de resposta e escreve os nomes das arquivo correspondentes
         with open('resposta.txt', 'w') as arquivoResposta:
             similaridades = []
             for numero in resultado:
-                faixa = faixas[numero - 1]
-                similaridade = calculaSimilaridade(pesosConsulta, pesos[faixa])
-                similaridades.append((faixa, similaridade))
+                arquivo = nomesArquivo[numero - 1]
+                similaridade = calcularSimilaridade(pesosConsulta, pesosDocumentos[arquivo])
+                similaridades.append((arquivo, similaridade))
 
             similaridades = sorted(similaridades, key=lambda x: x[1], reverse=True)
 
             arquivoResposta.write(f"{len(resultado)}\n")
-            for faixa, similaridade in similaridades:
-                arquivoResposta.write(f"{faixa}: {similaridade}\n")  
+            for arquivo, similaridade in similaridades:
+                arquivoResposta.write(f"{arquivo}: {similaridade}\n")  
 
 except FileNotFoundError as e:
     print(f"Erro para encontrar o arquivo: {e}")
